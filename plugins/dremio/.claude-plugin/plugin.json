@@ -1,0 +1,5 @@
+{
+  "name": "dremio",
+  "description": "Working with Dremio Cloud, including ingesting, transforming, and querying data",
+  "version": "1.0.0"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "dremio-plugins",
+  "owner": {
+    "name": "Dremio",
+    "email": "oss@dremio.com"
+  },
+  "metadata": {
+    "description": "Official Dremio plugins for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "dremio",
+      "source": "./plugins/dremio",
+      "description": "Working with Dremio Cloud, including ingesting, transforming, and querying data"
+    }
+  ]
+}

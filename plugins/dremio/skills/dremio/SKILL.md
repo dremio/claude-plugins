@@ -8,44 +8,40 @@ user-invocable: false
 
 A project contains **namespaces** (managed Iceberg storage, full DDL/DML) and **sources** (connections to external systems). Sources can be object storage (S3, ADLS), databases (Oracle, Postgres, MongoDB), or lakehouse catalogs (Unity Catalog, Glue). Lakehouse sources with Iceberg tables may support read/write. Tables in SQL: `"Namespace"."table"` or `"Namespace"."Folder"."table"`.
 
-## MCP Tools (Read-Only)
+## REST API
 
-| Tool | Purpose |
-|:-----|:--------|
-| `SearchTableAndViews` | Semantic search for tables/views. Start here when looking for data. |
-| `GetUsefulSystemTableNames` | List system tables (jobs, engines, users, metadata). |
-| `GetSchemaOfTable` | Column names and types for a table. |
-| `GetDescriptionOfTableOrSchema` | Descriptions and tags for tables/schemas. |
-| `GetTableOrViewLineage` | Data lineage for a table or view. |
-| `RunSqlQuery` | Execute SELECT queries only. |
+Use the REST API for all Dremio interactions. Base URL: `https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}`.
 
-All tool names are prefixed with `mcp__claude_ai_Dremio_Cloud__`.
+**Auth setup:** `DREMIO_PAT` and `DREMIO_PROJECT_ID` must be set. The `.env` file should use `export` and single quotes (PATs often contain `+`, `/`, `=` which can be mangled by the shell):
 
-## REST API (Read + Write)
+```
+export DREMIO_PAT='your_pat_here'
+export DREMIO_PROJECT_ID='your_project_id_here'
+```
 
-Use for any DDL/DML: CREATE, DROP, ALTER, COPY INTO, INSERT. Also for SELECT. Base URL: `https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}`.
+If the `.env` doesn't exist, ask the user to create one with their PAT and project ID.
 
-**Auth setup:** `DREMIO_PAT` and `DREMIO_PROJECT_ID` must be set. Source them with `source <project-dir>/.env` before making calls. If the `.env` doesn't exist, ask the user to create one with their PAT and project ID.
+**zsh + special characters:** PATs often contain `+`, `/`, `=` which zsh can silently corrupt. Either regenerate the PAT until you get one without `+`, or wrap REST API calls in `bash -c '.  /path/to/.env && curl ...'`.
+
+Use `jq` (not python) to parse JSON responses.
+
+### Search API
+
+Find tables, views, and other entities by keyword:
 
 ```bash
-# Submit SQL → get job ID → check status → (optionally) get results
-JOB=$(curl -s -X POST "https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}/sql" \
+curl -s -X POST "https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}/search" \
   -H "Authorization: Bearer $DREMIO_PAT" -H "Content-Type: application/json" \
-  -d '{"sql": "YOUR SQL HERE"}')
-JOB_ID=$(echo "$JOB" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-# Poll status (states: PENDING, PLANNING, QUEUED, ENGINE_START, RUNNING, COMPLETED, FAILED, CANCELED)
-curl -s "https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}/job/${JOB_ID}" \
-  -H "Authorization: Bearer $DREMIO_PAT"
-# Get SELECT results (once COMPLETED)
-curl -s "https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}/job/${JOB_ID}/results" \
-  -H "Authorization: Bearer $DREMIO_PAT"
+  -d '{"query": "search terms", "filter": "category in [\"TABLE\", \"VIEW\"]", "maxResults": 10}'
 ```
+
+Filter categories: `TABLE`, `VIEW`, `FOLDER`, `SPACE`, `SOURCE`, `REFLECTION`, `UDF`, `SCRIPT`, `JOB`. Results include paths, columns, wiki descriptions, and labels.
 
 ## Workflow
 
-1. **Find tables.** `SearchTableAndViews` with keywords. Fallback: `INFORMATION_SCHEMA."TABLES"` with `TABLE_TYPE != 'SYSTEM_TABLE'`.
-2. **Understand schema.** `GetSchemaOfTable` and `GetDescriptionOfTableOrSchema`.
-3. **Query.** SELECT → MCP or REST API. DDL/DML → REST API only.
+1. **Find tables.** Use the Search API with keywords. Fallback: `INFORMATION_SCHEMA."TABLES"` with `TABLE_TYPE != 'SYSTEM_TABLE'`.
+2. **Understand schema.** Search API returns columns inline. For more detail, query `INFORMATION_SCHEMA."COLUMNS"`.
+3. **Query.** Use the SQL API for all queries (SELECT, DDL, DML).
 4. **Present results** as markdown tables. Summarize findings. Suggest follow-ups.
 
 ## Data Ingestion

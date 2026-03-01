@@ -60,6 +60,52 @@ CREATE TABLE Namespace.my_table (id INT, name VARCHAR, created_at TIMESTAMP);
 COPY INTO Namespace.my_table FROM '@source/path/to/data/' FILE_FORMAT 'parquet';
 ```
 
+### COPY INTO — Critical Syntax Rules
+
+**Path format:** Always use `@source` with **forward slashes** for paths. NEVER use dot-notation.
+
+```sql
+-- CORRECT
+COPY INTO my_table FROM '@datasets/bucket-name/folder/' FILE_FORMAT 'parquet';
+
+-- WRONG — dot-notation causes "invalid source type" errors
+COPY INTO my_table FROM '@datasets."bucket"."folder"' FILE_FORMAT 'parquet';
+COPY INTO my_table FROM '@source."path"."to"' FILE_FORMAT 'parquet';
+```
+
+**Source names:** Do NOT quote the source name after `@`. Quoting causes "non-existent source" errors.
+
+```sql
+-- CORRECT
+COPY INTO my_table FROM '@datasets/path/to/data/' FILE_FORMAT 'parquet';
+
+-- WRONG — quoted source name fails
+COPY INTO my_table FROM '@"datasets"/path/to/data/' FILE_FORMAT 'parquet';
+```
+
+**FILE_FORMAT:** Just the format name in quotes. No `'type' =` prefix.
+
+```sql
+-- CORRECT
+FILE_FORMAT 'parquet'
+FILE_FORMAT 'csv'
+FILE_FORMAT 'json'
+
+-- WRONG
+FILE_FORMAT 'type' = 'parquet'    -- parser error
+```
+
+**Mixed schemas in a folder:** If a folder contains files with different schemas, point to the specific file — otherwise COPY INTO will fail when it encounters a file whose columns don't match the target table:
+
+```sql
+-- Folder has sales.parquet and customers.parquet with different schemas
+-- WRONG — will fail on schema mismatch
+COPY INTO my_sales FROM '@datasets/bucket/data/' FILE_FORMAT 'parquet';
+
+-- CORRECT — point to the specific file
+COPY INTO my_sales FROM '@datasets/bucket/data/sales.parquet' FILE_FORMAT 'parquet';
+```
+
 ## Folder Management
 
 Folders organize tables and views within namespaces. Use the REST API.
@@ -203,6 +249,29 @@ FROM flattened;
 - Access fields: `data['field_name']`
 - **Use CREATE TABLE** (not view) to materialize AI results — avoids re-running LLM on each query
 - For variable-length data: extract as VARCHAR JSON array, then `TRY_CONVERT_FROM` + `FLATTEN`
+
+## Job Status API
+
+When submitting DDL/DML via the REST API (CTAS, COPY INTO, CREATE FOLDER, etc.), the response returns a job ID. Poll for completion:
+
+```bash
+# Submit a SQL job
+JOB_ID=$(curl -s -X POST "https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}/sql" \
+  -H "Authorization: Bearer $DREMIO_PAT" -H "Content-Type: application/json" \
+  -d '{"sql": "CREATE TABLE ..."}' | jq -r '.id')
+
+# Poll job status
+curl -s "https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}/job/${JOB_ID}" \
+  -H "Authorization: Bearer ${DREMIO_PAT}" | jq '{jobState, rowCount, errorMessage}'
+```
+
+**Job states:** `PENDING`, `METADATA_RETRIEVAL`, `PLANNING`, `QUEUED`, `ENGINE_START`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELED`
+
+**Polling tips:**
+- CTAS on large tables (100M+ rows) can take 1-3 minutes
+- COPY INTO from parquet is typically faster than CTAS
+- CREATE FOLDER / CREATE TABLE (empty) complete in seconds
+- Check `errorMessage` on `FAILED` — common causes: syntax errors, schema mismatches, source permissions
 
 ## Discovering Data & System Analysis
 

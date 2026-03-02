@@ -22,7 +22,7 @@ Official [Claude Code](https://claude.ai/claude-code) plugins from [Dremio](http
 
 3. Run `/dremio-setup` in Claude Code for step-by-step guidance.
 
-For full MCP server setup instructions, see the [Dremio documentation](https://docs.dremio.com/dremio-cloud/developer/mcp-server/).
+For full MCP server setup instructions, see the [Dremio documentation](https://docs.dremio.com/dremio-cloud/developer/mcp-server/). To obtain an OAuth Client ID, you'll need to create an OAuth Application in your Dremio organization, with the Redirect URI set to "http://localhost/callback,https://claude.ai/api/mcp/auth_callback"
 
 ## Plugins
 

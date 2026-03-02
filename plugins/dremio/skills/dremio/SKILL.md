@@ -37,6 +37,8 @@ curl -s -X POST "https://api.dremio.cloud/v0/projects/${DREMIO_PROJECT_ID}/searc
 
 Filter categories: `TABLE`, `VIEW`, `FOLDER`, `SPACE`, `SOURCE`, `REFLECTION`, `UDF`, `SCRIPT`, `JOB`. Results include paths, columns, wiki descriptions, and labels.
 
+**Important — project name in search paths:** The Search API sometimes includes the project name (e.g., `"lakehouse-project"`) as the first element of the `path` array. This is a Dremio Cloud bug. **Never use the project name in SQL paths.** When constructing SQL from search results, strip the first path element if it matches a project name rather than a namespace or source. For example, if the search returns `["my-project", "MyNamespace", "MyTable"]`, the correct SQL reference is `MyNamespace."MyTable"`, not `"my-project".MyNamespace."MyTable"`.
+
 ## Workflow
 
 1. **Find tables.** Use the Search API with keywords. Fallback: `INFORMATION_SCHEMA."TABLES"` with `TABLE_TYPE != 'SYSTEM_TABLE'`.

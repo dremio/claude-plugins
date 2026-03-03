@@ -6,7 +6,7 @@ user-invocable: false
 
 # Dremio Cloud
 
-A project contains **namespaces** (managed Iceberg storage, full DDL/DML) and **sources** (connections to external systems). Sources can be object storage (S3, ADLS), databases (Oracle, Postgres, MongoDB), or lakehouse catalogs (Unity Catalog, Glue). Lakehouse sources with Iceberg tables may support read/write. Tables in SQL: `"Namespace"."table"` or `"Namespace"."Folder"."table"`.
+A project contains **namespaces** (managed Iceberg storage, full DDL/DML) and **sources** (connections to external systems). Sources can be object storage (S3, ADLS), databases (Oracle, Postgres, MongoDB), or other catalogs (Unity Catalog, Glue). Tables in SQL: `"Namespace"."table"` or `"Namespace"."Folder"."table"`.
 
 ## REST API
 
@@ -108,19 +108,22 @@ COPY INTO my_sales FROM '@datasets/bucket/data/' FILE_FORMAT 'parquet';
 COPY INTO my_sales FROM '@datasets/bucket/data/sales.parquet' FILE_FORMAT 'parquet';
 ```
 
-## Folder Management
+## Namespace & Folder Management
 
-Folders organize tables and views within namespaces. Use the REST API.
+**To create a new namespace** (top-level container for Iceberg tables and views), use `CREATE FOLDER` via the REST SQL API. Do NOT use the catalog REST API to create spaces — spaces cannot hold Iceberg tables.
 
 ```sql
-CREATE FOLDER Namespace.staging
-CREATE FOLDER Namespace.staging.temp          -- nested
-CREATE FOLDER IF NOT EXISTS Namespace.staging -- idempotent create
-DROP FOLDER Namespace.staging.temp            -- must drop children first
-DROP FOLDER Namespace.staging                 -- cannot drop non-empty folders
+CREATE FOLDER my_namespace                    -- create a new namespace
+CREATE FOLDER my_namespace.staging            -- subfolder within a namespace
+CREATE FOLDER my_namespace.staging.temp       -- nested subfolder
+CREATE FOLDER IF NOT EXISTS my_namespace      -- idempotent create
+DROP FOLDER my_namespace.staging.temp         -- must drop children first
+DROP FOLDER my_namespace.staging              -- cannot drop non-empty folders
 ```
 
 `DROP FOLDER IF EXISTS` is **not supported** — omit `IF EXISTS`.
+
+**Important:** Never use `AT BRANCH` syntax with CREATE/DROP FOLDER — it is not supported and will cause a parser error.
 
 ## Dremio SQL Reference
 
